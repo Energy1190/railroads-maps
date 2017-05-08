@@ -1,0 +1,100 @@
+{% extends "index.html" %}
+{% block title %}Maps{% endblock %}
+{% block script %}
+<script type="text/javascript">
+    // Создает обработчик события window.onLoad
+    var map;
+    var placemark;
+    var d;
+    var n;
+    ymaps.ready(function () {
+        // Создает экземпляр карты и привязывает его к созданному контейнеру
+        map = new ymaps.Map("YMapsID", {center: [55.76, 37.64], zoom: 10,  type: "yandex#satellite"});
+        // Создание метки
+        placemark = new ymaps.Placemark(
+              // Координаты метки
+                {{ tochka }}, {
+                /* Свойства метки:
+                   - контент значка метки */
+                iconContent: "Москва",
+                // - контент балуна метки
+                balloonContent: "Столица России"
+              }, {
+                /* Опции метки:
+                   - флаг перетаскивания метки */
+                draggable: true,
+                /* - показывать значок метки
+                     при открытии балуна */
+                hideIconOnBalloonOpen: false
+              }
+            );
+
+        // Добавление метки на карту
+        map.geoObjects.add(placemark);
+        // Генерация карты
+        // Создание точек-станций
+        {% for i in stations %}
+                placemark{{ loop.index }} = new ymaps.Placemark(
+              // Координаты метки
+                {{ i[1] }}, {
+                /* Свойства метки:
+                   - контент значка метки */
+                iconContent: "{{ i[0] }}",
+                // - контент балуна метки
+                balloonContent: "{{ i[0] }}"
+              }, {
+                /* Опции метки:
+                   - флаг перетаскивания метки */
+                draggable: false,
+                /* - показывать значок метки
+                     при открытии балуна */
+                hideIconOnBalloonOpen: false
+              }
+            );
+        map.geoObjects.add(placemark{{ loop.index }});
+        {% endfor %}
+        // Создание линий между станциями
+        {% for i in data %}
+        var myPolyline{{ loop.index }} = new ymaps.Polyline([
+              // Координаты вершин линий
+                {{ i[0] }},{{ i[1] }}
+            ], {
+              /* Свойства линии:
+                 - балун ломаной */
+              balloonContent: "Ломаная линия"
+              }, {
+                /* Опции линии:
+                   - отключение кнопки закрытия балуна */
+                balloonCloseButton: false,
+                // - цвет  и прозрачность линии
+                strokeColor: "0000FF55",
+                // - ширина линии
+                strokeWidth: 5
+              }
+            );
+
+        // Добавление линии на карту
+        map.geoObjects.add(myPolyline{{ loop.index }});
+        {% endfor %}
+        d = new Date();
+        n = d.getTime();
+        getjson(n, '22');
+    })
+    function movePlacemark(data) {
+        var pt = placemark.geometry.getCoordinates()
+        placemark.geometry.setCoordinates(data);
+        d = new Date();
+        n = d.getTime();
+    setTimeout("getjson(n, '22');", 1000);
+    }
+    function getjson(time, objectID) {
+        $.getJSON("/trains?time=" + time + "&object=" + objectID, function(data) {
+        movePlacemark(data['coordinate']);
+        })
+    }
+</script>
+{% endblock %}
+
+{% block content %}
+<div id="YMapsID" style="width:600px;height:400px"></div>
+{% endblock %}
