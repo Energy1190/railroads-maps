@@ -8,7 +8,6 @@ import time
 import datetime
 from flask import Flask, request, render_template, jsonify
 from railmap import main as c_map
-from lines import savelovskay
 
 app = Flask(__name__)
 maps = c_map()[0]
