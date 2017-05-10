@@ -1,8 +1,8 @@
-
+import pickle
 from parserus import *
 from database import *
 
-def get_info():
+def bild_stations():
     size='many'
     x = get_stations(url='http://osm.sbin.ru/esr/region:mosobl:l')
     drop_table('stations')
@@ -11,6 +11,79 @@ def get_info():
     create_table('neighbors', params='(name TEXT, neighbor1 TEXT, neighbor2 TEXT, neighbor3 TEXT, neighbor4 TEXT, neighbor5 TEXT)')
     datas = list(filter(None, prepare_data(x, size=size)))
     insert_to_table('stations', datas, size=size)
+
+def bild_schedule():
+    def generation_of_dates(list_object):
+        result = []
+        mouth_list = [0, 'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
+        for i in list_object:
+            x = i['mouth'].split(sep='(')
+            year = x[1][:-1]
+            if x[0] in mouth_list:
+                mouth = mouth_list.index(x[0])
+            else:
+                assert False
+            for j in i['days']:
+                y = (year, mouth, j)
+                result.append(y)
+        return result
+
+    def generation_of_times(time_list):
+        result = []
+        if len(time_list) != 4:
+            return False
+        if time_list[0] and len(time_list[0]) and ':' in time_list[0]:
+            x = time_list[0].split(sep=':')
+            result.append((int(x[0]), int(x[1])))
+        else:
+            result.append(None)
+        if time_list[1] and len(time_list[1]) and 'м' in time_list[1]:
+            x = re.findall(r'(\d*)\s?ч?м?\s?(\d*)\s?м?', time_list[1])
+            x = x[0]
+            if len(x) == 2 and x[1]:
+                result.append((int(x[0]), int(x[1])))
+            else:
+                result.append((None, int(x[0])))
+        else:
+            result.append(None)
+        if time_list[2] and len(time_list[2]) and ':' in time_list[2]:
+            x = time_list[0].split(sep=':')
+            result.append((int(x[0]), int(x[1])))
+        else:
+            result.append(None)
+        if time_list[3] and len(time_list[3]) and 'м' in time_list[3]:
+            x = re.findall(r'(\d*)\s?ч?м?\s?(\d*)\s?м?', time_list[3])
+            x = x[0]
+            if len(x) == 2 and x[1]:
+                result.append((int(x[0]), int(x[1])))
+            else:
+                result.append((None, int(x[0])))
+        else:
+            result.append(None)
+        return result
+
+    drop_table('trains')
+    drop_table('schedule')
+    drop_table('working days')
+    create_table('trains', params='(number TEXT, link TEXT, departure TEXT, arrival TEXT, periodicity TEXT)')
+    create_table('schedule', params='(train TEXT, departure TEXT, arrival TEXT, station_link TEXT, station_name TEXT, station_number REAL, coming_time BLOB,'
+                                    ' waiting_time BLOB, out_time BLOB, total_time BLOB)')
+    create_table('working days', params='(train TEXT, departure TEXT, arrival TEXT, days BLOB)')
+    lines, trains = get_schedule2('http://moskva.elektrichki.net/raspisanie/')
+
+    trains_insert = []
+    schedule_insert = []
+    working_days_insert = []
+    for i in trains:
+        i['schedule'] = get_schedule_station(i)
+        if i.get('periodicity_link'):
+            i['work_days'] = get_days_of_work(i['periodicity_link'])
+
+    for i in trains:
+        da = i['path'].split(sep=' → ')
+        times = generation_of_times([i['schedule']['coming_time'], i['schedule']['waiting_time'], i['schedule']['out_time'],i['schedule']['total_time']])
+        trains_insert.append((i['train_number'], i['main_link'], da[0], da[1]))
+        schedule_insert.append((i['train_number'], da[0], da[1], i['schedule']['link'], i['schedule']['name'], i['schedule']['station_number']))
 
 def generate_coordinate_map():
     def lazy_check(x1, x2, y1, y2):
@@ -60,7 +133,9 @@ def generate_coordinate_map():
 
 def main():
     if not check_exist_table('stations'):
-        get_info()
+        bild_stations()
+    if not check_exist_table('trains'):
+        bild_schedule()
     return ([i['coordinate'] for i in generate_coordinate_map()], [[i[0], [i[2], i[3]]] for i in get_table('stations')])
 
 

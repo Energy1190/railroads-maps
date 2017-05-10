@@ -127,10 +127,10 @@ def get_schedule_station(url):
         x = {}
         number = r'.st_num.>([\d]*)</'
         link_and_name = r'.st_name.><a href=.([\,\-\/\:\.\w\d]*).>([\-\w\d\s]*)<'
-        coming = r'.coming.>[\<\>\D\s]*([\:\d]*)</'
-        time = r'.time.>[\<\>\D\s]*([\s\d\w]*)</'
-        out = r'.outgo.>[\<\>\D\s]*([\:\d]*)</'
-        sum_time = r'.pathtime.>[\<\>\D\s]*([\s\d\w]*)</'
+        coming = r'\=.coming.>[\<\>\D\s]*([\:\d]*)</'
+        time = r'\=.time.>[\<\>\D\s]*([\s\d\w]*)</'
+        out = r'\=.outgo.>[\<\>\D\s]*([\:\d]*)</'
+        sum_time = r'\=.pathtime.>[\<\>\D\s]*([\s\d\w]*)</'
         lan = re.findall(link_and_name, i)
         try:
             x['station_number'] = re.findall(number, i)[0]
@@ -152,15 +152,49 @@ def get_days_of_work(url):
     result = []
     x = requests.get(url)
     txt = x.text
+    start = r'(?<=<div id=.full_calendar.)'
+    alls = r'(?:[\S]*[\s]*)*'
+    temp = re.findall(start + alls, txt)
+    cal = re.findall(r'<div class=.calendar_month[\s\_]?calendars_list.>[\s]*([\(\)\d\w]*)[\s]*</div>', temp[0])
+    temp = re.split(r'</table', temp[0])
+    for i in range(len(temp)):
+        days = re.findall(r'<td class=.selected.>[\s]*<div>([\d]*)', temp[i])
+        if len(days):
+            r = {'mouth': cal[i], 'days': days}
+            result.append(r)
 
-result = []
-x = requests.get('http://elektrichki.net/dni-sledovania/moskva-belorusskaya~kubinka-1~6701/')
-txt = x.text
-start = r'(?<=<div id=.full_calendar.)'
-alls = r'(?:[\S]*[\s]*)*'
-temp = re.findall(start + alls, txt)
-start_cal = r'<div[\s]*class=.small_calendar[\s]*months_list[\s]*.>'
-end_cal = r'(?<=</tr></table>)'
-temp = re.findall(alls_cal, temp[0])
-print(temp)
-print(len(temp))
+    return result
+def generation_of_times(time_list):
+    result = []
+    if len(time_list) != 4:
+        return False
+    if time_list[0] and len(time_list[0]) and ':' in time_list[0]:
+        x = time_list[0].split(sep=':')
+        result.append((int(x[0]), int(x[1])))
+    else:
+        result.append(None)
+    if time_list[1] and len(time_list[1]) and 'м' in time_list[1]:
+        x = re.findall(r'(\d*)\s?ч?м?\s?(\d*)\s?м?', time_list[1])
+        x = x[0]
+        if len(x) == 2 and x[1]:
+            result.append((int(x[0]), int(x[1])))
+        else:
+            result.append((None, int(x[0])))
+    else:
+        result.append(None)
+    if time_list[2] and len(time_list[2]) and ':' in time_list[2]:
+        x = time_list[0].split(sep=':')
+        result.append((int(x[0]), int(x[1])))
+    else:
+        result.append(None)
+    if time_list[3] and len(time_list[3]) and 'м' in time_list[3]:
+        x = re.findall(r'(\d*)\s?ч?м?\s?(\d*)\s?м?', time_list[3])
+        x = x[0]
+        if len(x) == 2 and x[1]:
+            result.append((int(x[0]), int(x[1])))
+        else:
+            result.append((None, int(x[0])))
+    else:
+        result.append(None)
+    return result
+
