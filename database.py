@@ -65,13 +65,13 @@ def drop_table(name):
     c.commit()
     c.close()
 
-def get_table(name):
+def get_table(name, fild='name'):
     if not check_exist_table(name):
         print('Table {0} does not exist'.format(name))
         return False
     c = sqlite3.connect(data())
     x = c.cursor()
-    result = list(x.execute('''SELECT * FROM {0} ORDER BY name'''.format(name)))[:]
+    result = list(x.execute('''SELECT * FROM {0} ORDER BY {1}'''.format(name, fild)))[:]
     c.close()
     return [i for i in result]
 
@@ -87,13 +87,13 @@ def get_one_entry(table, name):
     if len(result) == 1:
         return result[0]
 
-def get_many_entry(table, name, limit=10):
+def get_many_entry(table, name, limit=10, fild='name'):
     if not check_exist_table(table):
         print('Table {0} does not exist'.format(table))
         return False
     c = sqlite3.connect(data())
     x = c.cursor()
-    x.execute('''SELECT * FROM {0} WHERE name='{1}' LIMIT {2}'''.format(table, name, limit))
+    x.execute('''SELECT * FROM {0} WHERE {3}='{1}' LIMIT {2}'''.format(table, name, limit, fild))
     result = x.fetchall()
     c.close()
     return result
@@ -140,4 +140,4 @@ def prepare_data(datas, size='one'):
     else:
         return [prepare_data(i, size='one') for i in datas]
 
-#x = [{'link': 'http://www.openstreetmap.org/browse/node/419254131', 'name': 'Черусти', 'neighbors': ['Струя', 'Воймежный'], 'coordinates': [('55.5422017', '40.0049896')]}, {'link': 'http://www.openstreetmap.org/browse/node/2496131234', 'name': 'Струя', 'neighbors': ['Черусти'], 'coordinates': [('55.5248998', '40.1079467')]}, {'link': 'http://www.openstreetmap.org/browse/node/61088523', 'name': 'Москва-Пассажирская-Курская', 'neighbors': ['Москва-Товарная Курская', 'Москва-Каланчевская', 'Серп и Молот'], 'coordinates': [('55.7577737', '37.6621837')]}, {'link': 'http://www.openstreetmap.org/browse/node/1994609812', 'name': 'Серп и молот', 'neighbors': ['Москва-Пассажирская-Курская', 'Карачарово'], 'coordinates': [('55.7480922', '37.6821069')]}]
+# x = [{'link': 'http://www.openstreetmap.org/browse/node/419254131', 'name': 'Черусти', 'neighbors': ['Струя', 'Воймежный'], 'coordinates': [('55.5422017', '40.0049896')]}, {'link': 'http://www.openstreetmap.org/browse/node/2496131234', 'name': 'Струя', 'neighbors': ['Черусти'], 'coordinates': [('55.5248998', '40.1079467')]}, {'link': 'http://www.openstreetmap.org/browse/node/61088523', 'name': 'Москва-Пассажирская-Курская', 'neighbors': ['Москва-Товарная Курская', 'Москва-Каланчевская', 'Серп и Молот'], 'coordinates': [('55.7577737', '37.6621837')]}, {'link': 'http://www.openstreetmap.org/browse/node/1994609812', 'name': 'Серп и молот', 'neighbors': ['Москва-Пассажирская-Курская', 'Карачарово'], 'coordinates': [('55.7480922', '37.6821069')]}]

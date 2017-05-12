@@ -82,8 +82,34 @@ def bild_schedule():
     for i in trains:
         da = i['path'].split(sep=' → ')
         times = generation_of_times([i['schedule']['coming_time'], i['schedule']['waiting_time'], i['schedule']['out_time'],i['schedule']['total_time']])
+        times = list(map(pickle.dumps, times))
+        if i['periodicity_link']:
+            days = get_days_of_work(i['periodicity_link'])
+            days = generation_of_dates(days)
+            days = list(map(pickle.dumps, days))
+        else:
+            days = None
         trains_insert.append((i['train_number'], i['main_link'], da[0], da[1]))
-        schedule_insert.append((i['train_number'], da[0], da[1], i['schedule']['link'], i['schedule']['name'], i['schedule']['station_number']))
+        schedule_insert.append((i['train_number'], da[0], da[1], i['schedule']['link'], i['schedule']['name'], i['schedule']['station_number'], times[0],
+                                times[1], times[2], times[3]))
+        working_days_insert.append((i['train_number'], da[0], da[1], days))
+
+    insert_to_table('trains', trains_insert, size='many', len='(?,?,?,?,?)')
+    insert_to_table('schedule', schedule_insert, size='many', len='(?,?,?,?,?,?,?,?,?,?)')
+    insert_to_table('working days', working_days_insert, size='many', len='(?,?,?,?)')
+
+    drop_table('lines')
+    create_table('lines', params='(list BLOB)')
+
+    insert_to_table('lines', pickle.dumps(lines), len='(?)')
+
+def bild_dependencies(lines):
+    trains = []
+    for i in get_table('schedule', fild='train'):
+        trains.append(i[0])
+
+    for i in get_many_entry('schedule', fild='train', limit=100):
+        pass
 
 def generate_coordinate_map():
     def lazy_check(x1, x2, y1, y2):

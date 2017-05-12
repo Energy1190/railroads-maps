@@ -128,7 +128,7 @@ def get_schedule_station(url):
         number = r'.st_num.>([\d]*)</'
         link_and_name = r'.st_name.><a href=.([\,\-\/\:\.\w\d]*).>([\-\w\d\s]*)<'
         coming = r'\=.coming.>[\<\>\D\s]*([\:\d]*)</'
-        time = r'\=.time.>[\<\>\D\s]*([\s\d\w]*)</'
+        time = r'\<td class=.time.><div class=.timetable_pathtime.>[\\n\s]*([\s\d\w]*)</'
         out = r'\=.outgo.>[\<\>\D\s]*([\:\d]*)</'
         sum_time = r'\=.pathtime.>[\<\>\D\s]*([\s\d\w]*)</'
         lan = re.findall(link_and_name, i)
@@ -140,6 +140,8 @@ def get_schedule_station(url):
             x['waiting_time'] = re.findall(time, i)[0]
             x['out_time'] = re.findall(out, i)[0]
             x['total_time'] = re.findall(sum_time, i)[0]
+            if 'ч' in x['waiting_time']:
+                print(i)
         except:
             x['Fail'] = True
         result.append(x)
@@ -164,37 +166,3 @@ def get_days_of_work(url):
             result.append(r)
 
     return result
-def generation_of_times(time_list):
-    result = []
-    if len(time_list) != 4:
-        return False
-    if time_list[0] and len(time_list[0]) and ':' in time_list[0]:
-        x = time_list[0].split(sep=':')
-        result.append((int(x[0]), int(x[1])))
-    else:
-        result.append(None)
-    if time_list[1] and len(time_list[1]) and 'м' in time_list[1]:
-        x = re.findall(r'(\d*)\s?ч?м?\s?(\d*)\s?м?', time_list[1])
-        x = x[0]
-        if len(x) == 2 and x[1]:
-            result.append((int(x[0]), int(x[1])))
-        else:
-            result.append((None, int(x[0])))
-    else:
-        result.append(None)
-    if time_list[2] and len(time_list[2]) and ':' in time_list[2]:
-        x = time_list[0].split(sep=':')
-        result.append((int(x[0]), int(x[1])))
-    else:
-        result.append(None)
-    if time_list[3] and len(time_list[3]) and 'м' in time_list[3]:
-        x = re.findall(r'(\d*)\s?ч?м?\s?(\d*)\s?м?', time_list[3])
-        x = x[0]
-        if len(x) == 2 and x[1]:
-            result.append((int(x[0]), int(x[1])))
-        else:
-            result.append((None, int(x[0])))
-    else:
-        result.append(None)
-    return result
-
