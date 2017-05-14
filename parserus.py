@@ -64,6 +64,7 @@ def get_stations(url='http://osm.sbin.ru/esr/region:mosobl:l'):
 def get_schedule2(url):
     x = requests.get(url)
     txt = x.text
+    x.close()
     start = r'(?<=<div id="search_result">)'
     alls = r'[\S\s]*'
     temp = re.findall(start + alls, txt)
@@ -116,6 +117,7 @@ def get_schedule_station(url):
     result = []
     x = requests.get(url)
     txt = x.text
+    x.close()
     start = r'(?<=<table class="main_table">)'
     alls = r'(?:[\S]*[\s]*(?!</table>){1,1})*'
     temp = re.findall(start + alls, txt)
@@ -154,6 +156,7 @@ def get_days_of_work(url):
     result = []
     x = requests.get(url)
     txt = x.text
+    x.close()
     start = r'(?<=<div id=.full_calendar.)'
     alls = r'(?:[\S]*[\s]*)*'
     temp = re.findall(start + alls, txt)

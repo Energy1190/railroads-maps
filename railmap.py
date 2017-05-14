@@ -64,44 +64,43 @@ def bild_schedule():
 
     drop_table('trains')
     drop_table('schedule')
-    drop_table('working days')
+    drop_table('working_days')
     create_table('trains', params='(number TEXT, link TEXT, departure TEXT, arrival TEXT, periodicity TEXT)')
     create_table('schedule', params='(train TEXT, departure TEXT, arrival TEXT, station_link TEXT, station_name TEXT, station_number REAL, coming_time BLOB,'
                                     ' waiting_time BLOB, out_time BLOB, total_time BLOB)')
-    create_table('working days', params='(train TEXT, departure TEXT, arrival TEXT, days BLOB)')
+    create_table('working_days', params='(train TEXT, departure TEXT, arrival TEXT, days BLOB)')
     lines, trains = get_schedule2('http://moskva.elektrichki.net/raspisanie/')
 
     trains_insert = []
     schedule_insert = []
     working_days_insert = []
-    for i in trains:
-        i['schedule'] = get_schedule_station(i)
-        if i.get('periodicity_link'):
-            i['work_days'] = get_days_of_work(i['periodicity_link'])
 
     for i in trains:
+        i['schedule'] = get_schedule_station(i['main_link'])
         da = i['path'].split(sep=' → ')
-        times = generation_of_times([i['schedule']['coming_time'], i['schedule']['waiting_time'], i['schedule']['out_time'],i['schedule']['total_time']])
-        times = list(map(pickle.dumps, times))
-        if i['periodicity_link']:
+        for j in i['schedule']:
+            times = generation_of_times([j['coming_time'], j['waiting_time'], j['out_time'], j['total_time']])
+            times = list(map(pickle.dumps, times))
+            schedule_insert.append((i['train_number'], da[0], da[1], j['link'], j['name'],
+                                    j['station_number'], times[0],
+                                    times[1], times[2], times[3]))
+        if i.get('periodicity_link'):
             days = get_days_of_work(i['periodicity_link'])
             days = generation_of_dates(days)
-            days = list(map(pickle.dumps, days))
+            days = pickle.dumps(days)
         else:
             days = None
-        trains_insert.append((i['train_number'], i['main_link'], da[0], da[1]))
-        schedule_insert.append((i['train_number'], da[0], da[1], i['schedule']['link'], i['schedule']['name'], i['schedule']['station_number'], times[0],
-                                times[1], times[2], times[3]))
+        trains_insert.append((i['train_number'], i['main_link'], da[0], da[1], i['periodicity']))
         working_days_insert.append((i['train_number'], da[0], da[1], days))
 
     insert_to_table('trains', trains_insert, size='many', len='(?,?,?,?,?)')
     insert_to_table('schedule', schedule_insert, size='many', len='(?,?,?,?,?,?,?,?,?,?)')
-    insert_to_table('working days', working_days_insert, size='many', len='(?,?,?,?)')
+    insert_to_table('working_days', working_days_insert, size='many', len='(?,?,?,?)')
 
     drop_table('lines')
-    create_table('lines', params='(list BLOB)')
+    create_table('lines', params='(list BLOB, empty TEXT)')
 
-    insert_to_table('lines', pickle.dumps(lines), len='(?)')
+    insert_to_table('lines', [(pickle.dumps(lines), None)], size='many', len='(?,?)')
 
 def bild_dependencies(lines):
     trains = []
@@ -163,5 +162,3 @@ def main():
     if not check_exist_table('trains'):
         bild_schedule()
     return ([i['coordinate'] for i in generate_coordinate_map()], [[i[0], [i[2], i[3]]] for i in get_table('stations')])
-
-
