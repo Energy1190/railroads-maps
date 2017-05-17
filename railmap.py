@@ -4,13 +4,16 @@ from database import *
 
 def bild_stations():
     size='many'
-    x = get_stations(url='http://osm.sbin.ru/esr/region:mosobl:l')
     drop_table('stations')
     drop_table('neighbors')
     create_table('stations')
     create_table('neighbors', params='(name TEXT, neighbor1 TEXT, neighbor2 TEXT, neighbor3 TEXT, neighbor4 TEXT, neighbor5 TEXT)')
-    datas = list(filter(None, prepare_data(x, size=size)))
-    insert_to_table('stations', datas, size=size)
+    for i in ['http://osm.sbin.ru/esr/region:mosobl:l', 'http://osm.sbin.ru/esr/region:ryazan:l', 'http://osm.sbin.ru/esr/region:tul:l',
+              'http://osm.sbin.ru/esr/region:kaluzh:l', 'http://osm.sbin.ru/esr/region:smol:l', 'http://osm.sbin.ru/esr/region:tver:l',
+              'http://osm.sbin.ru/esr/region:yarosl:l', 'http://osm.sbin.ru/esr/region:ivanov:l', 'http://osm.sbin.ru/esr/region:vladimir:l']:
+        x = get_stations(url=i)
+        datas = list(filter(None, prepare_data(x, size=size)))
+        insert_to_table('stations', datas, size=size)
 
 def bild_schedule():
     def generation_of_dates(list_object):
@@ -162,3 +165,65 @@ def main():
     if not check_exist_table('trains'):
         bild_schedule()
     return ([i['coordinate'] for i in generate_coordinate_map()], [[i[0], [i[2], i[3]]] for i in get_table('stations')])
+
+def check_regexp(name):
+    def check(name):
+        return get_one_entry('stations', name)
+
+    def logic(symbol, name, checks, symbol2=None):
+        if symbol in name or symbol2 and symbol in name and symbol2 in name:
+            x = check(checks)
+            if x:
+                return checks
+        return None
+
+    tests = []
+    tests.append(logic('-', name, 'Аэропорт', symbol2='Внуково'))
+    tests.append(logic('Аэропорт Внуково', name, 'Аэропорт'))
+    tests.append(logic('Аэропорт', name, name.replace(' ', '-')))
+    tests.append(logic('Остановочный Пункт', name, ' '.join(name.split(sep= ' ')[0:2]).lower()))
+    tests.append(logic('Платформа', name, ' '.join(name.split(sep=' ')[-2:]).lower(), symbol2='Км'))
+    tests.append(logic('Пост', name, ' '.join(name.split(sep=' ')[-2:]).lower(), symbol2='Км'))
+    tests.append(logic('1', name, name.replace(' 1', '-I')))
+    tests.append(logic('1', name, name.replace(' 1', '-1')))
+    tests.append(logic('1', name, name.replace(' 1', ' I')))
+    tests.append(logic('2', name, name.replace(' 2', '-II')))
+    tests.append(logic('2', name, name.replace(' 2', '-2')))
+    tests.append(logic('2', name, name.replace(' 2', ' II')))
+    tests.append(logic('3', name, name.replace(' 3', '-III')))
+    tests.append(logic('3', name, name.replace(' 3', '-3')))
+    tests.append(logic('3', name, name.replace(' 3', ' III')))
+    tests.append(logic('1', name, name.replace(' 1', '')))
+    tests.append(logic('2', name, name.replace(' 2', '')))
+    tests.append(logic('3', name, name.replace(' 3', '')))
+    tests.append(logic('Платформа', name, name.replace('Платформа ', '')))
+    tests.append(logic(' ', name, name.replace(' ', '-')))
+    tests.append(logic('е', name, name.replace('е', 'ё', 1)))
+    tests.append(logic('И', name, name.replace('И', 'и').replace('М', 'м')))
+    tests.append(logic('Депо', name, 'Депо'))
+    tests.append(logic('Березки Дачные', name, 'Берёзки-Дачные'))
+    try:
+        tests.append(logic(' ', name, ' '.join([name.split(sep=' ')[0], name.split(sep=' ')[1].upper()])))
+    except:
+        pass
+
+    for i in tests:
+        if i:
+            return i
+
+    return False
+
+stations = []
+
+for i in get_table('schedule', fild='train'):
+    if i[4] not in stations:
+        stations.append(i[4])
+
+for i in stations:
+    if not get_one_entry('stations', i):
+        if not check_regexp(i):
+            print(i)
+
+for i in get_table('stations'):
+    if 'ачны' in i[0]:
+        print(i)

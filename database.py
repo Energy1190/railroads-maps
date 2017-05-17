@@ -75,13 +75,13 @@ def get_table(name, fild='name'):
     c.close()
     return [i for i in result]
 
-def get_one_entry(table, name):
+def get_one_entry(table, name, fild='name'):
     if not check_exist_table(table):
         print('Table {0} does not exist'.format(table))
         return False
     c = sqlite3.connect(data())
     x = c.cursor()
-    x.execute('''SELECT * FROM {0} WHERE name='{1}' LIMIT 1'''.format(table, name))
+    x.execute('''SELECT * FROM {0} WHERE {2}='{1}' LIMIT 1'''.format(table, name, fild))
     result = x.fetchall()
     c.close()
     if len(result) == 1:
@@ -130,7 +130,6 @@ def prepare_data(datas, size='one'):
             else:
                 print('It looks like the station is not connected to any other station.')
                 print(datas)
-                return None
             x = (datas['name'], datas['link'], datas['coordinates'][0][0], datas['coordinates'][0][1])
             return x
         else:
