@@ -1,4 +1,5 @@
 import re
+from lxml import html
 import requests
 
 # Парсим расписание
@@ -56,6 +57,62 @@ def get_stations(url='http://osm.sbin.ru/esr/region:mosobl:l'):
                 result.remove(i)
                 break
         break
+
+    return result
+
+def get_stations2(url='http://osm.sbin.ru/esr/region:mosobl:l'):
+    # Парсим координаты с карты
+    # Пример ссылки на карту - http://www.openstreetmap.org/browse/node/419254131
+    def get_geo_point(url):
+        x = requests.get(url)
+        txt = x.text
+        geo_point = re.findall(r'<div class="details geo">[\:\"\w\s\\n\t]*<a href="/[\#\=\.\w\d]*/([\.\d]*)/([\.\d]*)">', txt)
+        return geo_point
+
+    x = requests.get(url)
+    # txt = x.text
+
+    result = []
+    tree = html.fromstring(x.text)
+    buy_info3 = tree.xpath('//table//tr')
+    for i in range(0, len(buy_info3)):
+        dictus = {}
+        x = list(buy_info3[i].iterlinks())
+        if x:
+            for xx in x:
+                if 'http://www.openstreetmap.org/browse/node' in xx[2] and '127.0.0.1' not in xx[2]:
+                    dictus['link'] = xx[2]
+        x = str(buy_info3[i].text_content()).replace('\n', '').split(sep='     ')
+        x = list(map(str.strip, x))
+        for xx in range(len(x)):
+            if not x[xx]:
+                x[xx] = None
+            if x[xx] == '':
+                x[xx] = None
+        x = list(filter(None, x))
+
+        if str(x[0]).isnumeric():
+            dictus['number'] = x[0]
+            dictus['name'] = x[2]
+            dictus['second_name'] = x[1]
+        if len(x) > 3 and 'РЖД' not in x[3]:
+            dictus['neighbors'] = x[3]
+        for i in x:
+            if 'Московско-' in i:
+                dictus['location'] = i
+
+        if dictus.get('link'):
+            result.append(dictus)
+
+    for i in result:
+        if '\xa0' in i['name']:
+            x = str(i['name']).split(sep='\xa0')
+            i['name'] = x[0]
+            i['third_name'] = ''.join(x[1:])
+        if i.get('location'):
+            i['location'] = i['location'].split(sep=', ')[1]
+        i['check_name'] = str(i['name']).lower().replace('ё', 'е')
+        i['coordinates'] = get_geo_point(i['link'])
 
     return result
 

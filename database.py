@@ -122,7 +122,7 @@ def set_neighbors_table(name, list_data):
     datas = (name, x(list_data, 0), x(list_data, 1), x(list_data, 2), x(list_data, 3), x(list_data, 4))
     insert_to_table('neighbors', datas, size='one', len='(?,?,?,?,?,?)')
 
-def prepare_data(datas, size='one'):
+def prepare_data(datas, size='one', ver=1):
     if size == 'one':
         if datas.get('name') and datas.get('coordinates') and len(datas['coordinates']) and len(datas['coordinates'][0]):
             if datas.get('neighbors'):
@@ -130,8 +130,23 @@ def prepare_data(datas, size='one'):
             else:
                 print('It looks like the station is not connected to any other station.')
                 print(datas)
-            x = (datas['name'], datas['link'], datas['coordinates'][0][0], datas['coordinates'][0][1])
-            return x
+            if ver == 1:
+                x = (datas['name'], datas['link'], datas['coordinates'][0][0], datas['coordinates'][0][1])
+                return x
+            elif ver == 2:
+                if not datas.get('second_name'):
+                    datas['second_name'] = 'NULL'
+                if not datas.get('second_name'):
+                    datas['second_name'] = 'NULL'
+                if not datas.get('third_name'):
+                    datas['third_name'] = 'NULL'
+                if not datas.get('check_name'):
+                    datas['check_name'] = 'NULL'
+                if not datas.get('location'):
+                    datas['location'] = 'NULL'
+                x = (datas['name'], datas['second_name'], datas['third_name'], datas['check_name'], datas['link'],
+                     datas['location'], datas['number'], datas['coordinates'][0][0], datas['coordinates'][0][1])
+                return x
         else:
             print('Error in the data, it seems like no name or missing coordinates')
             print(datas)

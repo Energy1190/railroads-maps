@@ -6,14 +6,14 @@ def bild_stations():
     size='many'
     drop_table('stations')
     drop_table('neighbors')
-    create_table('stations')
+    create_table('stations', params='(name TEXT, second_name TEXT, third_name TEXT, check_name TEXT, link TEXT, location TEXT, number REAL, coordinateX REAL, coordinateY REAL)')
     create_table('neighbors', params='(name TEXT, neighbor1 TEXT, neighbor2 TEXT, neighbor3 TEXT, neighbor4 TEXT, neighbor5 TEXT)')
     for i in ['http://osm.sbin.ru/esr/region:mosobl:l', 'http://osm.sbin.ru/esr/region:ryazan:l', 'http://osm.sbin.ru/esr/region:tul:l',
               'http://osm.sbin.ru/esr/region:kaluzh:l', 'http://osm.sbin.ru/esr/region:smol:l', 'http://osm.sbin.ru/esr/region:tver:l',
               'http://osm.sbin.ru/esr/region:yarosl:l', 'http://osm.sbin.ru/esr/region:ivanov:l', 'http://osm.sbin.ru/esr/region:vladimir:l']:
-        x = get_stations(url=i)
-        datas = list(filter(None, prepare_data(x, size=size)))
-        insert_to_table('stations', datas, size=size)
+        x = get_stations2(url=i)
+        datas = list(filter(None, prepare_data(x, size=size, ver=2)))
+        insert_to_table('stations', datas, size=size, len='(?,?,?,?,?,?,?,?,?)')
 
 def bild_schedule():
     def generation_of_dates(list_object):
@@ -227,3 +227,4 @@ for i in stations:
 for i in get_table('stations'):
     if 'ачны' in i[0]:
         print(i)
+
