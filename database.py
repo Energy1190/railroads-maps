@@ -75,7 +75,7 @@ def get_table(name, fild='name'):
     c.close()
     return [i for i in result]
 
-def get_one_entry(table, name, fild='name'):
+def get_one_entry(table, name, fild='name', extend=False):
     if not check_exist_table(table):
         print('Table {0} does not exist'.format(table))
         return False
@@ -86,6 +86,13 @@ def get_one_entry(table, name, fild='name'):
     c.close()
     if len(result) == 1:
         return result[0]
+    elif extend:
+        x = ['second_name', 'third_name', 'check_name']
+        for i in x:
+            y = get_one_entry(table, name, fild=i)
+            if y: return y
+    else:
+        return None
 
 def get_many_entry(table, name, limit=10, fild='name'):
     if not check_exist_table(table):
@@ -122,7 +129,43 @@ def set_neighbors_table(name, list_data):
     datas = (name, x(list_data, 0), x(list_data, 1), x(list_data, 2), x(list_data, 3), x(list_data, 4))
     insert_to_table('neighbors', datas, size='one', len='(?,?,?,?,?,?)')
 
-def prepare_data(datas, size='one', ver=1):
+def table_len(num):
+    return '({0})'.format(str('?,' * num)[:-1])
+
+def set_nocoord_station(object):
+    if not check_exist_table('error_stations'):
+        print('Table {0} does not exist'.format('neighbors'))
+        return None
+    object['coordinates'] = ['1000','1000']
+    x = prepare_data(object, size='one', ver=2, base_len=9)
+    x = x[:-2]
+    insert_to_table('error_stations', x, size='one', len='({0})'.format(str('?,'*7)[:-1]))
+
+def prepare_data(datas, size='one', ver=1, base_len=0):
+    def check_len(num, check):
+        if num == check: return True
+        print('Len check fail')
+        return False
+
+    def check_version(version):
+        nonlocal datas
+        if int(version) == 1: return (datas['name'], datas['link'], datas['coordinates'][0][0], datas['coordinates'][0][1])
+        elif int(version) == 2: return (datas['name'], datas['second_name'], datas['third_name'], datas['check_name'], datas['link'],
+                                        datas['location'], datas['number'], datas['coordinates'][0][0], datas['coordinates'][0][1])
+
+    def refull_empty_fild(data2):
+        if not data2.get('second_name'):
+            data2['second_name'] = 'NULL'
+        if not datas.get('second_name'):
+            data2['second_name'] = 'NULL'
+        if not datas.get('third_name'):
+            data2['third_name'] = 'NULL'
+        if not datas.get('check_name'):
+            data2['check_name'] = 'NULL'
+        if not datas.get('location'):
+            data2['location'] = 'NULL'
+        return data2
+
     if size == 'one':
         if datas.get('name') and datas.get('coordinates') and len(datas['coordinates']) and len(datas['coordinates'][0]):
             if datas.get('neighbors'):
@@ -130,28 +173,17 @@ def prepare_data(datas, size='one', ver=1):
             else:
                 print('It looks like the station is not connected to any other station.')
                 print(datas)
-            if ver == 1:
-                x = (datas['name'], datas['link'], datas['coordinates'][0][0], datas['coordinates'][0][1])
-                return x
-            elif ver == 2:
-                if not datas.get('second_name'):
-                    datas['second_name'] = 'NULL'
-                if not datas.get('second_name'):
-                    datas['second_name'] = 'NULL'
-                if not datas.get('third_name'):
-                    datas['third_name'] = 'NULL'
-                if not datas.get('check_name'):
-                    datas['check_name'] = 'NULL'
-                if not datas.get('location'):
-                    datas['location'] = 'NULL'
-                x = (datas['name'], datas['second_name'], datas['third_name'], datas['check_name'], datas['link'],
-                     datas['location'], datas['number'], datas['coordinates'][0][0], datas['coordinates'][0][1])
-                return x
+            datas = refull_empty_fild(datas)
+            x = check_version(ver)
+            if check_len(len(x), base_len): return x
+            print(x)
+            return None
         else:
             print('Error in the data, it seems like no name or missing coordinates')
             print(datas)
+            set_nocoord_station(datas)
             return None
     else:
-        return [prepare_data(i, size='one') for i in datas]
+        return [prepare_data(i, size='one', ver=ver, base_len=base_len) for i in datas]
 
 # x = [{'link': 'http://www.openstreetmap.org/browse/node/419254131', 'name': 'Черусти', 'neighbors': ['Струя', 'Воймежный'], 'coordinates': [('55.5422017', '40.0049896')]}, {'link': 'http://www.openstreetmap.org/browse/node/2496131234', 'name': 'Струя', 'neighbors': ['Черусти'], 'coordinates': [('55.5248998', '40.1079467')]}, {'link': 'http://www.openstreetmap.org/browse/node/61088523', 'name': 'Москва-Пассажирская-Курская', 'neighbors': ['Москва-Товарная Курская', 'Москва-Каланчевская', 'Серп и Молот'], 'coordinates': [('55.7577737', '37.6621837')]}, {'link': 'http://www.openstreetmap.org/browse/node/1994609812', 'name': 'Серп и молот', 'neighbors': ['Москва-Пассажирская-Курская', 'Карачарово'], 'coordinates': [('55.7480922', '37.6821069')]}]

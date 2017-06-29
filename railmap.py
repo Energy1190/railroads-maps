@@ -4,16 +4,19 @@ from database import *
 
 def bild_stations():
     size='many'
+    base_len = 9
     drop_table('stations')
     drop_table('neighbors')
+    drop_table('error_stations')
     create_table('stations', params='(name TEXT, second_name TEXT, third_name TEXT, check_name TEXT, link TEXT, location TEXT, number REAL, coordinateX REAL, coordinateY REAL)')
     create_table('neighbors', params='(name TEXT, neighbor1 TEXT, neighbor2 TEXT, neighbor3 TEXT, neighbor4 TEXT, neighbor5 TEXT)')
+    create_table('error_stations', params='(name TEXT, second_name TEXT, third_name TEXT, check_name TEXT, link TEXT, location TEXT, number REAL)')
     for i in ['http://osm.sbin.ru/esr/region:mosobl:l', 'http://osm.sbin.ru/esr/region:ryazan:l', 'http://osm.sbin.ru/esr/region:tul:l',
               'http://osm.sbin.ru/esr/region:kaluzh:l', 'http://osm.sbin.ru/esr/region:smol:l', 'http://osm.sbin.ru/esr/region:tver:l',
               'http://osm.sbin.ru/esr/region:yarosl:l', 'http://osm.sbin.ru/esr/region:ivanov:l', 'http://osm.sbin.ru/esr/region:vladimir:l']:
         x = get_stations2(url=i)
-        datas = list(filter(None, prepare_data(x, size=size, ver=2)))
-        insert_to_table('stations', datas, size=size, len='(?,?,?,?,?,?,?,?,?)')
+        datas = list(filter(None, prepare_data(x, size=size, ver=2, base_len=base_len)))
+        insert_to_table('stations', datas, size=size, len='({0})'.format(str('?,'*base_len)[:-1]))
 
 def bild_schedule():
     def generation_of_dates(list_object):
@@ -220,11 +223,8 @@ for i in get_table('schedule', fild='train'):
         stations.append(i[4])
 
 for i in stations:
-    if not get_one_entry('stations', i):
+    if not get_one_entry('stations', i, extend=True):
         if not check_regexp(i):
             print(i)
 
-for i in get_table('stations'):
-    if 'ачны' in i[0]:
-        print(i)
 
