@@ -3,6 +3,9 @@ from parserus import *
 from database import *
 
 def bild_stations():
+    def fail_parser():
+        # Почему-то не добавляется, видимо происходит ошибка из-за ссылки не на координаты, а на область.
+        insert_to_table('stations', ('Щелково', 'Щёлково', 'NULL', 'щелково', 'http://www.openstreetmap.org/node/4085266440#map=18/55.90939/38.01063&layers=N', 'NULL','NULL', '55,9093905', '38,0087521'), size='one')
     size='many'
     base_len = 9
     drop_table('stations')
@@ -167,11 +170,11 @@ def main():
         bild_stations()
     if not check_exist_table('trains'):
         bild_schedule()
-    return ([i['coordinate'] for i in generate_coordinate_map()], [[i[0], [i[2], i[3]]] for i in get_table('stations')])
+    return ([i for i in build_line()], [[i[0], [float(i[-2]), float(i[-1])]] for i in get_table('stations') if str(i[-2]).isnumeric() and str(i[-1]).isnumeric()])
 
 def check_regexp(name):
     def check(name):
-        return get_one_entry('stations', name)
+        return get_one_entry('stations', name, extend=True)
 
     def logic(symbol, name, checks, symbol2=None):
         if symbol in name or symbol2 and symbol in name and symbol2 in name:
@@ -179,6 +182,9 @@ def check_regexp(name):
             if x:
                 return checks
         return None
+
+    if check(name):
+        return check(name)
 
     tests = []
     tests.append(logic('-', name, 'Аэропорт', symbol2='Внуково'))
@@ -203,8 +209,12 @@ def check_regexp(name):
     tests.append(logic(' ', name, name.replace(' ', '-')))
     tests.append(logic('е', name, name.replace('е', 'ё', 1)))
     tests.append(logic('И', name, name.replace('И', 'и').replace('М', 'м')))
+    tests.append(logic('и', name, name.upper()))
     tests.append(logic('Депо', name, 'Депо'))
     tests.append(logic('Березки Дачные', name, 'Берёзки-Дачные'))
+    tests.append(logic('оо', name, name.replace('оо', 'о')))
+    tests.append(logic('ая', name, name.replace('ая', 'ое')))
+    tests.append(logic('й', name, name.replace('й', 'и')))
     try:
         tests.append(logic(' ', name, ' '.join([name.split(sep=' ')[0], name.split(sep=' ')[1].upper()])))
     except:
@@ -212,19 +222,91 @@ def check_regexp(name):
 
     for i in tests:
         if i:
-            return i
+            return check(i)
 
     return False
 
-stations = []
+def build_line():
+    coordinate_lines = []
+    def schedule_in_memory():
+        return [i for i in get_table('schedule', fild='train')]
 
-for i in get_table('schedule', fild='train'):
-    if i[4] not in stations:
-        stations.append(i[4])
+    def generate_lines_name(x):
+        lines = {}
+        for i in x:
+            sep = ':'.join([i[1],i[2]])
+            if sep not in lines:
+                lines[sep] = []
+        return lines
 
-for i in stations:
-    if not get_one_entry('stations', i, extend=True):
-        if not check_regexp(i):
-            print(i)
+    def enter_statuon_in_line(line, schedule_list, line_list):
+        var = line.split(sep=':')
+        for i in schedule_list:
+            if var[0] == i[1] and var[1] == i[2]:
+                line_list.append((i[4], int(i[5])))
+        return line_list
 
+    def output(lines):
+        for i in lines:
+            print('-----------------------', i, '-----------------------')
+            for j in lines[i]:
+                print(j)
 
+    def sort_and_remove(line):
+        x = sorted(line, key=lambda x: x[1])
+        for i in x:
+            while x.count(i) > 1:
+                x.remove(i)
+        return x
+
+    def detect_duplicate(lines):
+        count = 0
+        for i in lines:
+            while lines.count(i) > 1:
+                count += 1
+                lines.remove(i)
+        return lines, count
+
+    def float_filter(lines):
+        # Ужасно тормозит
+        for i in range(len(lines)):
+            for j in range(len(lines[i])):
+                for n in range(len(lines[i][j])):
+                    lines[i][j][n] = float(lines[i][j][n])
+        return lines
+
+    x = schedule_in_memory()
+    lines = generate_lines_name(x)
+    for i in lines:
+        lines[i] = enter_statuon_in_line(i, x, lines[i])
+        lines[i] = sort_and_remove(lines[i])
+        for j in range(len(lines[i])):
+            y = check_regexp(lines[i][j][0])
+            lines[i][j] = (lines[i][j][1], y[0], y[-2:])
+
+    for i in lines:
+        for j in range(len(lines[i])):
+            if j+1 < len(lines[i]) and lines[i][j][0] + 1 == lines[i][j+1][0]:
+                coordinate_lines.append((lines[i][j][2], lines[i][j+1][2]))
+            elif j-1 > 0 and j+1 < len(lines[i]) and lines[i][j-1][0] + 1 == lines[i][j+1][0]:
+                coordinate_lines.append((lines[i][j-1][2], lines[i][j+1][2]))
+            elif j-2 > 0 and j+1 < len(lines[i]) and lines[i][j-2][0] + 1 == lines[i][j+1][0]:
+                coordinate_lines.append((lines[i][j-2][2], lines[i][j+1][2]))
+
+    y = detect_duplicate(coordinate_lines)
+    return y[0]
+
+def check_stations_name():
+    stations = []
+
+    for i in get_table('schedule', fild='train'):
+        if i[4] not in stations:
+            stations.append(i[4])
+
+    for i in stations:
+        if not get_one_entry('stations', i, extend=True):
+            if not check_regexp(i):
+                print(i)
+
+for i in build_line():
+    print(i)

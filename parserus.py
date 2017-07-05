@@ -62,6 +62,7 @@ def get_stations(url='http://osm.sbin.ru/esr/region:mosobl:l'):
 
 def get_stations2(url='http://osm.sbin.ru/esr/region:mosobl:l'):
     # Парсим координаты с карты
+    # Может перестать работать, если на карты будут наносить область станции, а не конкретную точку.
     # Пример ссылки на карту - http://www.openstreetmap.org/browse/node/419254131
     def get_geo_point(url):
         x = requests.get(url)
