@@ -2,17 +2,95 @@ import pickle
 from parserus import *
 from database import *
 
+class Station():
+    def __init__(self, tuple_obj):
+        assert len(tuple_obj) == 9
+        self.name = tuple_obj[0]
+        self.coordX = tuple_obj[-2]
+        self.coordY = tuple_obj[-1]
+        self.coords = (self.coordX, self.coordY)
+        self.neighbors = []
+        self.neighbors_num = 0
+        self.neighbors_coords = []
+
+    def set_neighbors(self):
+        x = get_one_entry('neighbors', self.name)
+        if x:
+            self.neighbors = list(filter(lambda x: False if x == 'NULL' else True, x[2:]))
+            self.neighbors_num = int(x[1])
+        for i in self.neighbors:
+            y = get_one_entry('stations', i, extend=True)
+            if y:
+                cx,cy = y[-2:]
+                self.neighbors_coords.append((cx,cy))
+
+    def get_over_station(self, name):
+        return get_one_entry('stations', name, fild='name', extend=True)
+
+    def get_over_station_coords(self, coords):
+        return get_one_entry('stations', coords[0], fild='coordinateX', name2=coords[1], fild2='coordinateY')
+
+    def check_neighbors(self, list_obj, coords_list):
+        def math_check(self, neighbors_coords, coords_list, coordX=self.coordX, coordY=self.coordY, result=[], count=0):
+            count += 1
+            if count == 500:
+                return result
+            areaX = (coordX-0.00001, coordX+0.00001)
+            areaY = (coordY-0.00001, coordY+0.00001)
+            for i in neighbors_coords:
+                if areaX[1] > i[0] > areaX[0] and areaY[1] > i[1] > areaY[0] and len(result) <4 and (i[0], i[1]) != self.coords:
+                    result.append(i)
+            for i in coords_list:
+                if areaX[1] > i[0] > areaX[0] and areaY[1] > i[1] > areaY[0] and len(result) < 4 and (i[0], i[1]) != self.coords:
+                    result.append(i)
+            if len(result) == 4 or len(result) == len(neighbors_coords):
+                return result
+            else:
+                return math_check(self, neighbors_coords, coords_list, coordX=coordX, coordY=coordY, result=result, count=count)
+
+        x = []
+        for i in list_obj:
+            if i in self.neighbors_coords:
+                x.append(i)
+
+        if self.neighbors_num == len(list_obj):
+            x = []
+            for i in list_obj:
+                x.append(i)
+            print("List is: ", list_obj)
+            self.parent = x
+
+        elif self.neighbors_num != len(list_obj):
+            alls = []
+            coords = []
+            for i in self.neighbors:
+                x = self.get_over_station(i)
+                if x and (x[0], x[-2],  x[-1]) not in alls and (x[-2],  x[-1]) not in coords:
+                    alls.append((x[0], x[-2],  x[-1]))
+                    coords.append((x[-2],  x[-1]))
+            for i in list_obj:
+                x = self.get_over_station_coords(i)
+                if x and (x[0], x[-2],  x[-1]) not in alls and (x[-2],  x[-1]) not in coords:
+                    alls.append((x[0], x[-2],  x[-1]))
+                    coords.append((x[-2], x[-1]))
+            self.parent = math_check(self, coords, coords_list)
+
+ #       print(self.name, self.neighbors_num, x)
+
 def bild_stations():
     def fail_parser():
         # Почему-то не добавляется, видимо происходит ошибка из-за ссылки не на координаты, а на область.
-        insert_to_table('stations', ('Щелково', 'Щёлково', 'NULL', 'щелково', 'http://www.openstreetmap.org/node/4085266440#map=18/55.90939/38.01063&layers=N', 'NULL','NULL', '55,9093905', '38,0087521'), size='one')
+        insert_to_table('stations', ('Щелково', 'Щёлково', 'NULL', 'щелково', 'http://www.openstreetmap.org/node/4085266440#map=18/55.90939/38.01063&layers=N', 'NULL','NULL', '55.9093905', '38.0087521'), size='one')
+        # Видимо переименовано в Болдино, у станции нет координат на карте
+        insert_to_table('stations', ('Сушнево', 'Сушнево', 'NULL', 'сушнево', 'http://www.openstreetmap.org/#map=18/55.96049/39.77948&layers=N', 'NULL','NULL', '55.96049', '39.77948'), size='one')
+
     size='many'
     base_len = 9
     drop_table('stations')
     drop_table('neighbors')
     drop_table('error_stations')
     create_table('stations', params='(name TEXT, second_name TEXT, third_name TEXT, check_name TEXT, link TEXT, location TEXT, number REAL, coordinateX REAL, coordinateY REAL)')
-    create_table('neighbors', params='(name TEXT, neighbor1 TEXT, neighbor2 TEXT, neighbor3 TEXT, neighbor4 TEXT, neighbor5 TEXT)')
+    create_table('neighbors', params='(name TEXT, count REAL, neighbor1 TEXT, neighbor2 TEXT, neighbor3 TEXT, neighbor4 TEXT, neighbor5 TEXT)')
     create_table('error_stations', params='(name TEXT, second_name TEXT, third_name TEXT, check_name TEXT, link TEXT, location TEXT, number REAL)')
     for i in ['http://osm.sbin.ru/esr/region:mosobl:l', 'http://osm.sbin.ru/esr/region:ryazan:l', 'http://osm.sbin.ru/esr/region:tul:l',
               'http://osm.sbin.ru/esr/region:kaluzh:l', 'http://osm.sbin.ru/esr/region:smol:l', 'http://osm.sbin.ru/esr/region:tver:l',
@@ -20,6 +98,7 @@ def bild_stations():
         x = get_stations2(url=i)
         datas = list(filter(None, prepare_data(x, size=size, ver=2, base_len=base_len)))
         insert_to_table('stations', datas, size=size, len='({0})'.format(str('?,'*base_len)[:-1]))
+        fail_parser()
 
 def bild_schedule():
     def generation_of_dates(list_object):
@@ -165,13 +244,6 @@ def generate_coordinate_map():
     x = list(filter(lambda i: True if type(i) == dict else False, x))
     return x
 
-def main():
-    if not check_exist_table('stations'):
-        bild_stations()
-    if not check_exist_table('trains'):
-        bild_schedule()
-    return ([i for i in build_line()], [[i[0], [float(i[-2]), float(i[-1])]] for i in get_table('stations') if str(i[-2]).isnumeric() and str(i[-1]).isnumeric()])
-
 def check_regexp(name):
     def check(name):
         return get_one_entry('stations', name, extend=True)
@@ -270,10 +342,37 @@ def build_line():
     def float_filter(lines):
         # Ужасно тормозит
         for i in range(len(lines)):
+            lines[i] = list(lines[i])
             for j in range(len(lines[i])):
+                lines[i][j] = list(lines[i][j])
                 for n in range(len(lines[i][j])):
+                    if type(lines[i][j][n]) == str:
+                        lines[i][j][n] = lines[i][j][n].replace(',', '.')
                     lines[i][j][n] = float(lines[i][j][n])
         return lines
+
+    def file_create(lines):
+        pickle.dump(lines, map_file(action='wb'))
+
+    def check_stations_name():
+        stations = []
+        r = True
+
+        for i in get_table('schedule', fild='train'):
+            if i[4] not in stations:
+                stations.append(i[4])
+
+        for i in stations:
+            if not get_one_entry('stations', i, extend=True):
+                if not check_regexp(i):
+                    print(i, 'not found')
+                    r = False
+
+        return r
+
+    if not check_stations_name():
+        print('Some station not found. Fail')
+        return False
 
     x = schedule_in_memory()
     lines = generate_lines_name(x)
@@ -282,7 +381,12 @@ def build_line():
         lines[i] = sort_and_remove(lines[i])
         for j in range(len(lines[i])):
             y = check_regexp(lines[i][j][0])
-            lines[i][j] = (lines[i][j][1], y[0], y[-2:])
+            try:
+                lines[i][j] = (lines[i][j][1], y[0], y[-2:])
+            except:
+                print("Lines object is ", lines[i][j], "as type", type(lines[i][j]))
+                print("Regexp object is", y, "as type", type(y))
+                raise
 
     for i in lines:
         for j in range(len(lines[i])):
@@ -293,20 +397,64 @@ def build_line():
             elif j-2 > 0 and j+1 < len(lines[i]) and lines[i][j-2][0] + 1 == lines[i][j+1][0]:
                 coordinate_lines.append((lines[i][j-2][2], lines[i][j+1][2]))
 
+    point = {}
     y = detect_duplicate(coordinate_lines)
-    return y[0]
+    for i in float_filter(y[0]):
+        if tuple(i[0]) not in point:
+            point[tuple(i[0])] = []
+        if tuple(i[1]) not in point:
+            point[tuple(i[1])] = []
+        if tuple(i[1]) not in point[tuple(i[0])]:
+            point[tuple(i[0])].append(tuple(i[1]))
+        if tuple(i[0]) not in point[tuple(i[1])]:
+            point[tuple(i[1])].append(tuple(i[0]))
 
-def check_stations_name():
-    stations = []
+    pickle.dump(point, map_file(action='wb'))
 
-    for i in get_table('schedule', fild='train'):
-        if i[4] not in stations:
-            stations.append(i[4])
+def build_map():
+    x = pickle.load(map_file())
+    maps = []
+    for i in x:
+        y = Station(get_one_entry('stations', i[0], fild='coordinateX', name2=i[1], fild2='coordinateY'))
+        y.set_neighbors()
+        y.check_neighbors(x[i], [j for j in x])
+        for i in y.parent:
+            if (i, (y.coordX, y.coordY)) not in maps or ((y.coordX, y.coordY), i) not in maps:
+                maps.append((i, (y.coordX, y.coordY)))
+            print((i, (y.coordX, y.coordY)))
+    return maps
 
-    for i in stations:
-        if not get_one_entry('stations', i, extend=True):
-            if not check_regexp(i):
-                print(i)
+def build_graph():
+    result = []
+    lines_list = ['https://www.tutu.ru/06.php', 'https://www.tutu.ru/01.php', 'https://www.tutu.ru/02.php', 'https://www.tutu.ru/05.php',
+                  'https://www.tutu.ru/04.php', 'https://www.tutu.ru/08.php', 'https://www.tutu.ru/03.php', 'https://www.tutu.ru/07.php',
+                  'https://www.tutu.ru/09.php', 'https://www.tutu.ru/10.php']
+    for i in lines_list:
+        result.append(get_line_map(i))
 
-for i in build_line():
-    print(i)
+    pickle.dump(result, map_file(action='wb',filename='graph.db'))
+
+# --------------------------------- main function ----------------------------------------------------------------------
+# Если отсутсвуют данные собирает информация о станциях, поездах и линиях из модуля parserus.py. И Выполняет их обработку
+# для построения карты линий и станций. Возвращает список всех необходимых к построению линий и список всех необходимых к
+# построению станций.
+def main():
+    x = os.path.dirname(os.path.abspath(__file__))
+    if not check_exist_table('stations'):
+        bild_stations()
+    if not check_exist_table('trains'):
+        bild_schedule()
+    if not os.path.exists(os.path.join(x, 'data', 'graph.db')):
+        build_graph()
+    if not os.path.exists(os.path.join(x, 'data', 'map.db')):
+        build_line()
+    for i in pickle.load(map_file(filename='graph.db')):
+        for j in i:
+            if not i[j]:
+                print(i, j)
+
+#    return ([list(map(list, i)) for i in build_map()], [[i[0], [float(i[-2]), float(i[-1])]] for i in get_table('stations') if str(i[-2]).isnumeric() and str(i[-1]).isnumeric()])
+
+# ----------------------------------------------------------------------------------------------------------------------
+
+main()

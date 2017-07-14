@@ -9,6 +9,14 @@ def data():
     path = os.path.join(path, 'data.db')
     return path
 
+def map_file(action='rb', filename='map.db'):
+    x = os.path.dirname(os.path.abspath(__file__))
+    path = os.path.join(x, 'data')
+    if not os.path.exists(path):
+        os.mkdir(path)
+    path = os.path.join(path, filename)
+    return open(path, action)
+
 def check_exist_table(name):
     for i in get_table_list():
         for j in i:
@@ -75,13 +83,15 @@ def get_table(name, fild='name'):
     c.close()
     return [i for i in result]
 
-def get_one_entry(table, name, fild='name', extend=False):
+def get_one_entry(table, name, fild='name', name2=None, fild2=None, doble='', extend=False):
     if not check_exist_table(table):
         print('Table {0} does not exist'.format(table))
         return False
+    if name2 and fild2:
+        doble= '''AND {0}='{1}' '''.format(fild2, name2)
     c = sqlite3.connect(data())
     x = c.cursor()
-    x.execute('''SELECT * FROM {0} WHERE {2}='{1}' LIMIT 1'''.format(table, name, fild))
+    x.execute('''SELECT * FROM {0} WHERE {2}='{1}' {3} LIMIT 1'''.format(table, name, fild, doble))
     result = x.fetchall()
     c.close()
     if len(result) == 1:
@@ -125,8 +135,15 @@ def set_neighbors_table(name, list_data):
     if not check_exist_table('neighbors'):
         print('Table {0} does not exist'.format('neighbors'))
         return None
+
+    if type(list_data) != list:
+        print('Invalid neighbors data in {0}'.format(str(list_data)))
+        print('Data type is {0}'.format(type(list_data)))
+        print('I repair it!')
+        list_data = list_data.split(sep=',')
+
     x = get_element_or_none
-    datas = (name, x(list_data, 0), x(list_data, 1), x(list_data, 2), x(list_data, 3), x(list_data, 4))
+    datas = (name, len(list_data), x(list_data, 0), x(list_data, 1), x(list_data, 2), x(list_data, 3), x(list_data, 4))
     insert_to_table('neighbors', datas, size='one', len='(?,?,?,?,?,?)')
 
 def table_len(num):

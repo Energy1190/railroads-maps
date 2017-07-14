@@ -227,3 +227,96 @@ def get_days_of_work(url):
             result.append(r)
 
     return result
+
+# Парсим карту станций
+# Пример ссылки https://www.tutu.ru/06.php
+def get_line_map(url):
+    result = []
+    x = requests.get(url)
+    txt = x.text
+    tree = html.fromstring(txt)
+    x.close()
+
+    info = tree.xpath('.//body/div[@id="wrapper"]/div/div[@id="scheme_table"]/div/div/div[@class="row"]/*')
+
+    count = 0
+    row = 0
+    rows = [[]]
+    for i in range(len(info)):
+        if 'path' in list(info[i].classes):
+            # rows[row].append(list(info[i].classes))
+            if list(info[i].classes) == ['col', 'path', 'vertical']:
+                rows[row].append(('NULL', count, row))
+            x = info[i].text_content().replace('\n', '').replace('\t', '').replace('\xa0', '')
+            if x:
+                rows[row].append(
+                    (info[i].text_content().replace('\n', '').replace('\t', '').replace('\xa0', ''), count, row))
+        count += 1
+        if not count % 23:
+            row += 1
+            count = 0
+            rows.append([])
+
+    station_map = {}
+    temp = {}
+    for i in range(len(rows)):
+        for j in range(len(rows[i])):
+            if not station_map.get(rows[i][j][0]) and '...' not in rows[i][j][0] and 'NULL' not in rows[i][j][0]:
+                station_map[rows[i][j][0]] = []
+            temp[(rows[i][j][1], rows[i][j][2])] = rows[i][j][0]
+
+    row_list = []
+    for i in range(len(temp)):
+        x = list(temp)[i]
+        if x[0] not in row_list: row_list.append(x[0])
+
+    temp = {(row_list.index(i[0]) + 1, i[1]): temp[i] for i in temp}
+    for i in range(len(temp)):
+        for j in station_map:
+            station_map[j] = list(filter(lambda x: False if x == "NULL" else True, station_map[j]))
+        x = list(temp)[i]
+        if '...' not in temp[x] and 'NULL' not in temp[x]:
+            t = temp.get((x[0] - 1, x[1] - 1))
+            g = temp.get((x[0], x[1] - 1))
+            if t and t not in station_map[temp[x]] and g != 'NULL':
+                station_map[temp[x]].append(t)
+            t = temp.get((x[0] + 1, x[1] + 1))
+            g = temp.get((x[0], x[1] + 1))
+            if t and t not in station_map[temp[x]] and g != 'NULL':
+                station_map[temp[x]].append(t)
+            count = 0
+            t = temp.get((x[0], x[1] + 1))
+            while t == 'NULL':
+                count += 1
+                t = temp.get((x[0], x[1] + count))
+            if t and t not in station_map[temp[x]]:
+                station_map[temp[x]].append(t)
+            count = 0
+            t = temp.get((x[0], x[1] - 1))
+            while t == 'NULL':
+                count += 1
+                t = temp.get((x[0], x[1] - count))
+            if t and t not in station_map[temp[x]]:
+                station_map[temp[x]].append(t)
+            t = temp.get((x[0] - 1, x[1]))
+            g = temp.get((x[0] + 1, x[1]))
+            if not t and not g:
+                t = temp.get((x[0] - 1, x[1] + 1))
+                g = temp.get((x[0] + 1, x[1] + 1))
+                if t and t != 'NULL' and '...' not in t and t not in station_map[temp[x]] and len(station_map[t]) < 2:
+                    station_map[temp[x]].append(t)
+                if g and g != 'NULL' and '...' not in g and g not in station_map[temp[x]] and len(station_map[g]) < 2:
+                    station_map[temp[x]].append(g)
+
+    for i in station_map:
+        for j in station_map[i]:
+            try:
+                if i not in station_map[j]:
+                    station_map[j].append(i)
+            except KeyError:
+                pass
+
+    return station_map
+
+
+
