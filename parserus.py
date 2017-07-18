@@ -231,92 +231,169 @@ def get_days_of_work(url):
 # Парсим карту станций
 # Пример ссылки https://www.tutu.ru/06.php
 def get_line_map(url):
-    result = []
-    x = requests.get(url)
-    txt = x.text
-    tree = html.fromstring(txt)
-    x.close()
+    def get_html_text(url):
+        x = requests.get(url)
+        tree = html.fromstring(x.text)
+        x.close()
+        return tree
 
-    info = tree.xpath('.//body/div[@id="wrapper"]/div/div[@id="scheme_table"]/div/div/div[@class="row"]/*')
+    def get_parser(obj):
+        info = obj.xpath('.//body/div[@id="wrapper"]/div/div[@id="scheme_table"]/div/div/div[@class="row"]/*')
+        zonenum = obj.xpath('.//body/div[@id="wrapper"]/div/div[@id="scheme_table"]/div/div')
+        col_in_row = int(len(info) / len((zonenum)))
+        return (info, col_in_row)
 
-    count = 0
-    row = 0
-    rows = [[]]
-    for i in range(len(info)):
-        if 'path' in list(info[i].classes):
-            # rows[row].append(list(info[i].classes))
-            if list(info[i].classes) == ['col', 'path', 'vertical']:
-                rows[row].append(('NULL', count, row))
-            x = info[i].text_content().replace('\n', '').replace('\t', '').replace('\xa0', '')
-            if x:
-                rows[row].append(
-                    (info[i].text_content().replace('\n', '').replace('\t', '').replace('\xa0', ''), count, row))
-        count += 1
-        if not count % 23:
-            row += 1
-            count = 0
-            rows.append([])
+    def format_array(array, num):
+        count = 0
+        row = 0
+        rows = [[]]
+        for i in range(len(array)):
+            if 'path' in list(array[i].classes):
+                # rows[row].append(list(info[i].classes))
+                if list(array[i].classes) == ['col', 'path', 'vertical']:
+                    rows[row].append(('NULL', count, row))
+                if 'round' in list(array[i].classes)[-1]:
+                    rows[row].append((list(array[i].classes)[-1].replace('round', ''), count, row))
+                x = array[i].text_content().replace('\n', '').replace('\t', '').replace('\xa0', '')
+                if x:
+                    rows[row].append(
+                        (info[i].text_content().replace('\n', '').replace('\t', '').replace('\xa0', ''), count, row))
+            count += 1
+            if not count % num:
+                row += 1
+                count = 0
+                rows.append([])
+        return rows
 
-    station_map = {}
-    temp = {}
-    for i in range(len(rows)):
-        for j in range(len(rows[i])):
-            if not station_map.get(rows[i][j][0]) and '...' not in rows[i][j][0] and 'NULL' not in rows[i][j][0]:
-                station_map[rows[i][j][0]] = []
-            temp[(rows[i][j][1], rows[i][j][2])] = rows[i][j][0]
+    def generate_temp_dict(obj):
+        nonlocal station_map
+        temp = {}
+        row_list = []
+        for i in range(len(rows)):
+            for j in range(len(rows[i])):
+                if not station_map.get(rows[i][j][0]) and '...' not in rows[i][j][0] and 'NULL' not in rows[i][j][0]:
+                    station_map[rows[i][j][0]] = []
+                temp[(rows[i][j][1], rows[i][j][2])] = rows[i][j][0]
 
-    row_list = []
-    for i in range(len(temp)):
-        x = list(temp)[i]
-        if x[0] not in row_list: row_list.append(x[0])
+        for i in range(len(temp)):
+            x = list(temp)[i]
+            if x[0] not in row_list: row_list.append(x[0])
 
-    temp = {(row_list.index(i[0]) + 1, i[1]): temp[i] for i in temp}
-    for i in range(len(temp)):
+        row_list.sort()
+        temp = {(row_list.index(i[0]) + 1, i[1]): temp[i] for i in temp}
+        return temp
+
+    def remove_null():
+        nonlocal station_map
+        nonlocal round_list
+        for i in station_map:
+            for j in station_map[i]:
+                try:
+                    if i not in station_map[j]:
+                        station_map[j].append(i)
+                except KeyError:
+                    pass
+
+        for i in round_list:
+            try:
+                del station_map[i]
+            except:
+                pass
+    # Основная логика, основана на анализе карты
+    def generate_graph(obj, temp, append_flag=False):
+        def check_alg(obj, obj2, x, obj2check=True):
+            nonlocal station_map
+            nonlocal temp
+            nonlocal append_flag
+            nonlocal round_list
+            for i in ['T', 'TL', 'TR', 'L', 'R']:
+                if obj == i:
+                    return False
+            if obj and obj not in station_map[temp[x]]:
+                if obj2check and obj2 not in round_list or not obj2check:
+                    station_map[temp[x]].append(obj)
+                    if obj != 'NULL': append_flag=True
+                    return True
+            return False
+
+        nonlocal station_map
+        nonlocal round_list
+        i = obj
         for j in station_map:
             station_map[j] = list(filter(lambda x: False if x == "NULL" else True, station_map[j]))
+            station_map[j] = list(filter(lambda x: False if 'T' in str(x) else True, station_map[j]))
+            station_map[j] = list(filter(lambda x: False if 'R' in str(x) else True, station_map[j]))
+            station_map[j] = list(filter(lambda x: False if 'L' in str(x) else True, station_map[j]))
+
         x = list(temp)[i]
-        if '...' not in temp[x] and 'NULL' not in temp[x]:
-            t = temp.get((x[0] - 1, x[1] - 1))
-            g = temp.get((x[0], x[1] - 1))
-            if t and t not in station_map[temp[x]] and g != 'NULL':
-                station_map[temp[x]].append(t)
-            t = temp.get((x[0] + 1, x[1] + 1))
-            g = temp.get((x[0], x[1] + 1))
-            if t and t not in station_map[temp[x]] and g != 'NULL':
-                station_map[temp[x]].append(t)
+        if '...' not in temp[x] and ',' not in temp[x] and 'NULL' not in temp[x] and temp[x] not in round_list:
+            g = 0
             count = 0
             t = temp.get((x[0], x[1] + 1))
-            while t == 'NULL':
-                count += 1
-                t = temp.get((x[0], x[1] + count))
-            if t and t not in station_map[temp[x]]:
-                station_map[temp[x]].append(t)
+            while t == 'NULL' or t in round_list:
+                if t == 'NULL':
+                    count += 1
+                    t = temp.get((x[0], x[1] + count))
+                if t and t in round_list:
+                    if t and 'TR' in t or t and 'RB' in t or t and 'BR' in t:
+                        count2 = 0
+                        while not t and count2 < 10 or t in round_list and count2 < 10:
+                            count2 += 1
+                            t = temp.get((x[0] - count2, x[1] + count))
+                            if not t or t and t in round_list:
+                                t = temp.get((x[0] - count2, x[1] - count + 1))
+                            if not t or t and t in round_list:
+                                t = temp.get((x[0] - count2, x[1] - count - 1))
+                    if t and 'TL' in t or t and 'LB' in t or t and 'BL' in t:
+                        count2 = 0
+                        while not t and count2 < 10 or t in round_list and count2 < 10:
+                            count2 += 1
+                            t = temp.get((x[0] + count2, x[1] + count))
+                            if not t or t and t in round_list:
+                                t = temp.get((x[0] + count2, x[1] - count + 1))
+                            if not t or t and t in round_list:
+                                t = temp.get((x[0] + count2, x[1] - count - 1))
+            check_alg(t, g, x, obj2check=False)
             count = 0
             t = temp.get((x[0], x[1] - 1))
-            while t == 'NULL':
-                count += 1
-                t = temp.get((x[0], x[1] - count))
-            if t and t not in station_map[temp[x]]:
-                station_map[temp[x]].append(t)
-            t = temp.get((x[0] - 1, x[1]))
-            g = temp.get((x[0] + 1, x[1]))
-            if not t and not g:
-                t = temp.get((x[0] - 1, x[1] + 1))
-                g = temp.get((x[0] + 1, x[1] + 1))
-                if t and t != 'NULL' and '...' not in t and t not in station_map[temp[x]] and len(station_map[t]) < 2:
-                    station_map[temp[x]].append(t)
-                if g and g != 'NULL' and '...' not in g and g not in station_map[temp[x]] and len(station_map[g]) < 2:
-                    station_map[temp[x]].append(g)
+            while t == 'NULL' or t in round_list:
+                if t == 'NULL':
+                    count += 1
+                    t = temp.get((x[0], x[1] - count))
+                if t and t in round_list:
+                    if t and 'TR' in t or t and 'RB' in t or t and 'BR' in t:
+                        if temp[x] == 'Аэропорт (Шереметьево)': print('Start DEBUG')
+                        count2 = 0
+                        while not t and count2 < 10 or t in round_list and count2 < 10:
+                            count2 += 1
+                            t = temp.get((x[0] - count2, x[1] - count))
+                            if not t or t and t in round_list:
+                                t = temp.get((x[0] - count2, x[1] - count - 1))
+                            if not t or t and t in round_list:
+                                t = temp.get((x[0] - count2, x[1] - count + 1))
+                            if temp[x] == 'Аэропорт (Шереметьево)': print('End t', t)
+                    if t and 'TL' in t or t and 'LB' in t or t and 'BL' in t:
+                        count2 = 0
+                        while not t and count2 < 10 or t in round_list and count2 < 10:
+                            count2 += 1
+                            t = temp.get((x[0] + count2, x[1] - count))
+                            if not t or t and t in round_list:
+                                t = temp.get((x[0] + count2, x[1] - count - 1))
+                            if not t or t and t in round_list:
+                                t = temp.get((x[0] + count2, x[1] - count + 1))
+            check_alg(t, g, x, obj2check=False)
 
-    for i in station_map:
-        for j in station_map[i]:
-            try:
-                if i not in station_map[j]:
-                    station_map[j].append(i)
-            except KeyError:
-                pass
+    round_list = ['T', 'TL', 'TR', 'L', 'R', 'RB', 'BL']
+    station_map = {}
+    tree = get_html_text(url)
+    info, col_in_row = get_parser(tree)
+    rows = format_array(info, col_in_row)
+    temp = generate_temp_dict(rows)
 
+    for i in range(len(temp)):
+        generate_graph(i, temp)
+
+    remove_null()
     return station_map
 
-
-
+print(get_line_map('https://www.tutu.ru/09.php'))

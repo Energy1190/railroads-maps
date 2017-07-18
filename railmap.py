@@ -449,9 +449,9 @@ def main():
     if not os.path.exists(os.path.join(x, 'data', 'map.db')):
         build_line()
     for i in pickle.load(map_file(filename='graph.db')):
+        print("--------------------"*10)
         for j in i:
-            if not i[j]:
-                print(i, j)
+            print(j, i[j])
 
 #    return ([list(map(list, i)) for i in build_map()], [[i[0], [float(i[-2]), float(i[-1])]] for i in get_table('stations') if str(i[-2]).isnumeric() and str(i[-1]).isnumeric()])
 
