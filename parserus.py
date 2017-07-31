@@ -255,6 +255,8 @@ def get_line_map(url):
                 if 'round' in list(array[i].classes)[-1]:
                     rows[row].append((list(array[i].classes)[-1].replace('round', ''), count, row))
                 x = array[i].text_content().replace('\n', '').replace('\t', '').replace('\xa0', '')
+                if 'path' in list(array[i].classes)[-1] and list(array[i].classes)[-1].replace('path', ''):
+                    rows[row].append(('NULL', count, row))
                 if x:
                     rows[row].append(
                         (info[i].text_content().replace('\n', '').replace('\t', '').replace('\xa0', ''), count, row))
@@ -395,5 +397,3 @@ def get_line_map(url):
 
     remove_null()
     return station_map
-
-print(get_line_map('https://www.tutu.ru/09.php'))
